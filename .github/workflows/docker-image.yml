@@ -3,6 +3,12 @@ name: Docker Image CI
 on:
   push:
     branches: [ "master" ]
+    
+env:
+  ECS_SERVICE: frontend-react-service
+  ECS_CLUSTER: devcluster
+  ECS_TASK_DEFINITION: frontend-react-td
+  CONTAINER_NAME: frontend-react     
 
 jobs:
   build:
@@ -21,9 +27,27 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
     - name: Push image to Amazon ECR
+      id: push-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: shalu
       run: |
         docker build . --file Dockerfile --tag $ECR_REGISTRY/$ECR_REPOSITORY:$(date +%s) --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest
         docker image push --all-tags $ECR_REGISTRY/$ECR_REPOSITORY
+        echo "IMAGE_TAG=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+        
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+      with:
+        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.push-image.outputs.IMAGE_TAG }}
+
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true

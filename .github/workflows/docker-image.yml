@@ -7,7 +7,7 @@ on:
 env:
   ECS_SERVICE: frontend-react-service
   ECS_CLUSTER: devcluster
-  ECS_TASK_DEFINITION: frontend-react-td
+  ECS_TASK_DEFINITION: .aws/taskdefinition.json
   CONTAINER_NAME: frontend-react     
 
 jobs:
